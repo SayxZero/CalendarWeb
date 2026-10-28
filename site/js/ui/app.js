@@ -26,7 +26,7 @@ import {
   today, addDays, at, dateOf, minuteOfDay, toSeconds, fromSeconds, daysTo, parts, startOfMonth, startOfWeek,
   addMonths, isValidDate, nowSeconds, DAY_SECONDS,
 } from '../model/dates.js';
-import { longDate, monthTitle, MONTHS, MONTHS_GENITIVE, WEEKDAYS_SHORT, capitalize, pluralRu } from '../model/text.js';
+import { longDate, monthTitle, MONTHS, MONTHS_GENITIVE, WEEKDAYS_SHORT, capitalize } from '../model/text.js';
 import { isActive, normalizeRule } from '../model/recurrence.js';
 import { DEFAULT_START_MINUTES } from '../model/reminders.js';
 import { Kind, normalize, isClosed, calendarColor, isForeign } from '../model/records.js';
@@ -40,14 +40,13 @@ const SCREENS = [
 ];
 
 export class App {
-  constructor({ store, sync, engine, account, serverAddress, version, offline = false, onSignOut }) {
+  constructor({ store, sync, engine, account, serverAddress, version, onSignOut }) {
     this.store = store;
     this.sync = sync;
     this.engine = engine;
     this.account = account;
     this.serverAddress = serverAddress;
     this.version = version;
-    this.offline = offline;
     this.onSignOut = onSignOut;
     this.search = '';
     this.viewName = SCREENS.some(([k]) => k === settings.get('lastView')) ? settings.get('lastView') : 'month';
@@ -84,12 +83,11 @@ export class App {
     this.viewEl = h('div', { class: 'view' });
     this.filterBar = h('div', { class: 'filterbar' });
     this.statusEl = h('div', { class: 'status-line' });
-    this.banner = h('div', { class: 'offline-banner', hidden: true });
     this.fab = h('button', { class: 'fab', title: 'Создать', attrs: { 'aria-label': 'Создать' }, on: { click: () => this.fabAction() } }, icon('plus'));
     this.shell = h('div', { class: 'shell' },
       this.sidebar,
       h('div', { class: 'drawer-scrim', on: { click: () => this.toggleDrawer(false) } }),
-      h('main', { class: 'main' }, this.banner, this.topbar, this.viewEl, this.filterBar, this.statusEl),
+      h('main', { class: 'main' }, this.topbar, this.viewEl, this.filterBar, this.statusEl),
       this.fab);
     clear(root).append(this.shell);
     this.listenOnce();
@@ -195,12 +193,10 @@ export class App {
   syncStateLine() {
     const state = this.sync?.state || 'idle';
     if (state === 'syncing') return h('div', { class: 'sync-state' }, h('span', { class: 'spin' }, icon('sync')), 'Синхронизация…');
-    if (state === 'offline') return h('div', { class: 'sync-state bad' }, icon('offline'), 'Нет связи');
     if (state === 'error') return h('div', { class: 'sync-state bad', title: this.sync.error }, icon('offline'), 'Ошибка синхронизации');
     if (state === 'auth') return h('div', { class: 'sync-state bad' }, 'Войдите снова');
-    const pending = this.store.journal.size;
     const last = this.sync?.lastSync;
-    return h('div', { class: 'sync-state' }, pending ? `Ждут отправки: ${pending}` : last ? `Синхронизировано в ${last.slice(11, 16)}` : this.account?.login || '');
+    return h('div', { class: 'sync-state' }, last ? `Синхронизировано в ${last.slice(11, 16)}` : this.account?.login || '');
   }
 
   navDetail(key) {
@@ -294,16 +290,10 @@ export class App {
 
   renderStatus() {
     const state = this.sync?.state;
-    const pending = this.store.journal.size;
-    const offline = this.offline || state === 'offline';
-    this.banner.hidden = !offline && state !== 'auth';
-    this.banner.textContent = state === 'auth' ? 'Сервер не принимает ваш вход — войдите снова (Настройки → Аккаунт)'
-      : `Нет связи с сервером синхронизации — правки сохраняются в браузере${pending ? ` (${pending})` : ''} и уйдут, когда связь вернётся`;
     const tasksOpen = this.store.openTasks().length;
     this.statusEl.className = ['status-line', state === 'error' ? 'warn' : ''].join(' ');
     this.statusEl.textContent = [
       state === 'error' ? `Ошибка синхронизации: ${this.sync.error}` : this.sync?.lastSync ? `Синхронизировано: ${this.sync.lastSync.replace('T', ' ').slice(0, 16)}` : '',
-      pending ? `ждут отправки: ${pending}` : '',
       `открытых задач: ${tasksOpen}, просрочено: ${this.store.overdueCount()}`,
       this.serverAddress ? `сервер ${this.serverAddress}` : '',
     ].filter(Boolean).join(' · ');
@@ -520,7 +510,7 @@ export class App {
    * minute ago elsewhere wins over a stale copy); waits 2.5 s at most.
    */
   async freshen(kind, id) {
-    if (!this.sync || this.sync.state === 'offline' || this.sync.state === 'auth') return;
+    if (!this.sync || this.sync.state === 'error' || this.sync.state === 'auth') return;
     let overlay = null;
     const timer = setTimeout(() => {
       overlay = h('div', { class: 'busy' }, h('span', { class: 'spin' }, icon('sync')), 'Проверяем, нет ли правок с других устройств…');
@@ -755,17 +745,14 @@ export class App {
 
   onSync(event) {
     if (event.type === 'state') {
-      if (event.state === 'idle') this.offline = false;
       this.renderChrome();
       if (event.state === 'auth') this.onAuthLost?.();
       return;
     }
     if (event.type === 'synced') {
-      this.offline = false;
       this.renderChrome();
       for (const conflict of event.conflicts || []) this.onConflict(conflict);
     }
-    if (event.type === 'republish-offer') this.offerRepublish(false);
   }
 
   /** What a shared calendar could not take, told rather than swallowed. */
@@ -788,29 +775,8 @@ export class App {
     this.sync.syncNow();
   }
 
-  /** The server lost what it had confirmed: everything of this device goes again. */
-  async offerRepublish(asked) {
-    const key = `cosmos.republishAsked.${this.account?.login}`;
-    if (!asked) {
-      try {
-        if (localStorage.getItem(key)) return;
-        localStorage.setItem(key, '1');
-      } catch { /* asked again next time, no harm */ }
-    }
-    const ok = await confirm({ title: 'Выгрузить всё заново?', text: 'Сервер не знает записей, которые есть здесь (аккаунт создан заново или базу сервера восстановили из копии). Отправить на сервер все записи аккаунта из этого браузера?', ok: 'Выгрузить' });
-    if (!ok) return;
-    const count = this.store.republishAll();
-    this.engine.reset();
-    toast(`Записей к отправке: ${count}`);
-    this.sync.syncNow();
-  }
-
   async signOut() {
-    const pending = this.store.journal.size;
-    const text = pending
-      ? `${pending} ${pluralRu(pending, 'правка ещё не отправлена', 'правки ещё не отправлены', 'правок ещё не отправлено')} на сервер и пропадёт при выходе. Всё равно выйти?`
-      : 'Копия аккаунта в этом браузере удалится; записи останутся на сервере и в планере.';
-    if (!await confirm({ title: 'Выйти из аккаунта?', text, ok: 'Выйти', danger: !!pending })) return;
+    if (!await confirm({ title: 'Выйти из аккаунта?', text: 'Записи останутся на сервере и в планере.', ok: 'Выйти' })) return;
     this.onSignOut?.();
   }
 }

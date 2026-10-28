@@ -17,7 +17,7 @@ export function setUnauthorizedHandler(handler) {
  * One request. Resolves to {ok, status, body, error, retryAfter}; never
  * rejects - a network failure is {ok: false, status: 0}.
  */
-export async function request(method, path, body = undefined, { timeoutMs = 15000 } = {}) {
+export async function request(method, path, body = undefined, { timeoutMs = 15000, keepalive = false } = {}) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -32,6 +32,8 @@ export async function request(method, path, body = undefined, { timeoutMs = 1500
       body: method === 'GET' ? undefined : JSON.stringify(body ?? {}),
       credentials: 'same-origin',
       cache: 'no-store',
+      // A request sent while the page closes is finished by the browser.
+      keepalive,
       signal: controller.signal,
     });
     let payload = null;
@@ -75,7 +77,7 @@ export const api = {
   logout: () => request('POST', '/api/logout', {}),
   profile: (displayName) => request('POST', '/api/profile', { displayName }),
   password: (oldPassword, newPassword) => request('POST', '/api/password', { oldPassword, newPassword }),
-  sync: (body) => request('POST', '/api/sync', body, { timeoutMs: 60000 }),
+  sync: (body, { keepalive = false } = {}) => request('POST', '/api/sync', body, { timeoutMs: 60000, keepalive }),
   record: (kind, id, timeoutMs = 2500) =>
     request('GET', `/api/record?kind=${encodeURIComponent(kind)}&id=${encodeURIComponent(id)}`, undefined, { timeoutMs }),
   share: (calendar) => request('GET', `/api/share?calendar=${encodeURIComponent(calendar)}`),

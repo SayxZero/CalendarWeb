@@ -4,7 +4,6 @@ import assert from 'node:assert/strict';
 import { setClock } from '../site/js/model/dates.js';
 import { Store } from '../site/js/core/store.js';
 import { SyncEngine } from '../site/js/core/sync.js';
-import { MemoryMeta } from '../site/js/core/persist.js';
 import { Kind } from '../site/js/model/records.js';
 import { FakeServer } from './fakeserver.js';
 
@@ -15,7 +14,7 @@ const tick = (n = 1000) => { ms += n; };
 function device() {
   const store = new Store();
   store.ensureSeed();
-  return { store, engine: new SyncEngine(store, new MemoryMeta()) };
+  return { store, engine: new SyncEngine(store) };
 }
 
 function exchange(server, dev, tag) {

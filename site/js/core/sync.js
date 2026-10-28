@@ -31,25 +31,19 @@ function addChange(change, pending, batch) {
 }
 
 export class SyncEngine {
-  /** @p meta: {get(key), set(key, value)} - the cursor lives there. */
-  constructor(store, meta) {
+  constructor(store) {
     this.store = store;
-    this.meta = meta;
+    // The revision of the server this page has seen, kept in memory only: a
+    // new page starts from zero and takes the whole account.
+    this.cursor = 0;
+    this.lastSync = '';
     this.restored = new Set();
     this.conflicts = [];
-  }
-
-  get cursor() {
-    return Number(this.meta.get('cursor') || 0);
   }
 
   /** "Вернуть": the server lets this change of a record the owner deleted through. */
   markRestored(kind, id) {
     this.restored.add(keyOf(kind, id));
-  }
-
-  reset() {
-    this.meta.set('cursor', 0);
   }
 
   /** The body of POST /api/sync and the journal lines it carries. */
@@ -94,8 +88,8 @@ export class SyncEngine {
       if (addChange(change, pending, batch)) ++count;
     }
     this.store.applyRemote(batch, before <= 0);
-    this.meta.set('cursor', response.revision);
-    this.meta.set('lastSync', now());
+    this.cursor = response.revision;
+    this.lastSync = now();
     return count;
   }
 
@@ -113,9 +107,11 @@ export class SyncEngine {
 const RETRY_STEPS = [15, 30, 60, 120];
 
 /**
- * When to sync: 3 seconds after a change, every few minutes, when the page
- * comes back to the front, when the network returns; after a failure again in
- * 15, 30, 60 and 120 seconds.
+ * When to sync: 3 seconds after a change, every few minutes and when the page
+ * comes back to the front; when it goes away with changes not sent yet, at
+ * once, by a request that outlives the page. A failed exchange (the server
+ * is busy, restarting) is tried again in 15, 30, 60 and 120 seconds. There is
+ * no work without the server: the site lives beside it.
  */
 export class SyncService {
   constructor(engine, api, { device, intervalMinutes = 15 } = {}) {
@@ -125,7 +121,7 @@ export class SyncService {
     this.intervalMinutes = intervalMinutes;
     this.state = 'idle';
     this.error = '';
-    this.lastSync = engine.meta.get('lastSync') || '';
+    this.lastSync = '';
     this.running = false;
     this.again = false;
     this.failures = 0;
@@ -149,17 +145,18 @@ export class SyncService {
     this.emit({ type: 'state', state, error });
   }
 
+  /** Starts; resolves to whether the first exchange went through. */
   start() {
     this.stopped = false;
     this.engine.store.onLocalChange = () => this.schedule(3000);
     this.onVisible = () => {
       if (document.visibilityState === 'visible') this.syncNow();
-      else if (this.engine.store.journal.size) this.syncNow();
+      else this.flush();
     };
-    this.onOnline = () => this.syncNow();
+    this.onHide = () => this.flush();
     document.addEventListener('visibilitychange', this.onVisible);
-    window.addEventListener('online', this.onOnline);
-    this.syncNow();
+    window.addEventListener('pagehide', this.onHide);
+    return this.syncNow();
   }
 
   stop() {
@@ -167,7 +164,16 @@ export class SyncService {
     clearTimeout(this.timer);
     this.engine.store.onLocalChange = () => {};
     document.removeEventListener('visibilitychange', this.onVisible);
-    window.removeEventListener('online', this.onOnline);
+    window.removeEventListener('pagehide', this.onHide);
+  }
+
+  /**
+   * The page is hidden or closing: what waits in the journal goes now, with
+   * keepalive, so that the browser finishes the request even when the page is
+   * gone. Nothing of the account is kept in the browser to send it later.
+   */
+  flush() {
+    if (this.engine.store.journal.size && !this.running) this.syncNow({ keepalive: true });
   }
 
   schedule(ms) {
@@ -177,7 +183,7 @@ export class SyncService {
   }
 
   /** Syncs now, or right after the exchange already under way. */
-  async syncNow() {
+  async syncNow({ keepalive = false } = {}) {
     if (this.stopped) return false;
     if (this.running) {
       this.again = true;
@@ -189,24 +195,21 @@ export class SyncService {
     let ok = false;
     try {
       const { body, sent } = this.engine.buildRequest(this.device);
-      const result = await this.api.sync(body);
+      const result = await this.api.sync(body, { keepalive });
       if (result.ok) {
         const received = this.engine.applyResponse(result.body, sent);
         this.failures = 0;
-        this.lastSync = this.engine.meta.get('lastSync') || '';
+        this.lastSync = this.engine.lastSync;
         ok = true;
         this.setState('idle');
         this.emit({ type: 'synced', received, accepted: result.body.accepted, conflicts: this.engine.conflicts });
-        if (this.engine.cursor === 0 && this.engine.store.maps.event.size + this.engine.store.maps.task.size > 0) {
-          this.emit({ type: 'republish-offer' });
-        }
       } else if (result.status === 401) {
         this.setState('auth', result.error);
       } else {
-        this.fail(result.status === 0 ? 'offline' : 'error', result.error, result.retryAfter);
+        this.fail(result.error, result.retryAfter);
       }
     } catch (failure) {
-      this.fail('error', failure.message || String(failure));
+      this.fail(failure.message || String(failure));
     } finally {
       this.running = false;
     }
@@ -220,10 +223,10 @@ export class SyncService {
     return ok;
   }
 
-  fail(state, error, retryAfter = 0) {
+  fail(error, retryAfter = 0) {
     const step = RETRY_STEPS[Math.min(this.failures, RETRY_STEPS.length - 1)];
     this.failures += 1;
-    this.setState(state, error);
+    this.setState('error', error);
     this.schedule(Math.max(step, retryAfter) * 1000);
   }
 
@@ -233,7 +236,7 @@ export class SyncService {
    * a full exchange follows in the background either way.
    */
   async refreshRecord(kind, id) {
-    if (this.stopped || this.state === 'offline') return false;
+    if (this.stopped || this.state === 'error') return false;
     const result = await this.api.record(kind, id, 2500);
     let changed = false;
     if (result.ok) changed = this.engine.applyRecord(result.body);

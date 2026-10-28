@@ -106,7 +106,7 @@ export function openSettings(app, section = 'look') {
     about: () => [
       h('div', null, h('b', null, 'Космос календарь — сайт'), ` ${app.version || ''}`),
       h('div', { class: 'muted' }, `Сервер синхронизации: ${app.serverAddress || '—'}`),
-      h('div', { class: 'muted small' }, 'Сайт — ещё одно устройство вашего аккаунта: те же записи, что в планере на компьютере и телефоне. Копия аккаунта хранится в этом браузере и при выходе удаляется.'),
+      h('div', { class: 'muted small' }, 'Сайт — ещё одно устройство вашего аккаунта: те же записи, что в планере на компьютере и телефоне. Записи берутся с сервера при каждом открытии страницы, в браузере не хранятся.'),
       h('div', { class: 'muted small' }, 'Клавиши: ← → — период, T — сегодня, N — новое событие, / — поиск.'),
     ],
   };
@@ -244,8 +244,7 @@ function accountSection(app, dialog) {
     setting('Как часто', '', select('syncIntervalMinutes', [[5, 'Каждые 5 минут'], [15, 'Каждые 15 минут'], [30, 'Каждые 30 минут'], [60, 'Каждый час']], () => app.sync?.setInterval(settings.get('syncIntervalMinutes')))),
     h('div', { class: 'row wrap' },
       h('button', { class: 'btn', on: { click: () => changeName(app) } }, icon('user'), 'Изменить имя…'),
-      h('button', { class: 'btn', on: { click: () => changePassword() } }, icon('lock'), 'Сменить пароль…'),
-      h('button', { class: 'btn', on: { click: () => app.offerRepublish(true) } }, icon('upload'), 'Выгрузить всё заново…')),
+      h('button', { class: 'btn', on: { click: () => changePassword() } }, icon('lock'), 'Сменить пароль…')),
     h('button', { class: 'btn danger', style: { alignSelf: 'flex-start' }, on: { click: () => { dialog.close(null); app.signOut(); } } }, icon('logout'), 'Выйти из аккаунта'),
   ];
 }

@@ -1,8 +1,9 @@
 // The planner of one account in memory: a port of the planner's
-// core/datastore.cpp. Every change goes into memory, then to the cache in the
-// browser (persist hooks), then to the journal the sync sends to the server,
-// and listeners hear about it. The rules are the planner's own - read it
-// beside DataStore when changing one.
+// core/datastore.cpp. Every change goes into memory, then to the journal the
+// sync sends to the server, and listeners hear about it. Nothing is kept in
+// the browser between visits: the page takes the account from the server each
+// time it opens. The rules are the planner's own - read it beside DataStore
+// when changing one.
 
 import {
   today, now, nowMs, dateOf, toSeconds, fromSeconds, shiftDays, daysTo, addDays, DAY_SECONDS, at,
@@ -32,10 +33,7 @@ export class Store {
     this.pendingKinds = new Set();
     this.flushQueued = false;
     this.trackedSinceAnnounce = false;
-    // The cache in the browser and the sync listen here; tests leave them be.
-    this.onWrite = () => {};
-    this.onJournal = () => {};
-    this.onMeta = () => {};
+    // The sync listens here; tests leave it be.
     this.onLocalChange = () => {};
   }
 
@@ -60,20 +58,16 @@ export class Store {
 
   put(kind, record) {
     this.maps[kind].set(record.id, record);
-    this.onWrite(kind, record.id, record);
   }
 
   drop(kind, id) {
-    const had = this.maps[kind].delete(id);
-    if (had) this.onWrite(kind, id, null);
-    return had;
+    return this.maps[kind].delete(id);
   }
 
   track(kind, id, deleted = false) {
     if (!this.tracking || !id) return;
     const entry = { kind, id, deleted, modified: Math.max(nowMs(), (this.journal.get(keyOf(kind, id))?.modified ?? 0) + 1) };
     this.journal.set(keyOf(kind, id), entry);
-    this.onJournal(keyOf(kind, id), entry);
     this.trackedSinceAnnounce = true;
   }
 
@@ -81,21 +75,6 @@ export class Store {
     if (!this.trackedSinceAnnounce) return;
     this.trackedSinceAnnounce = false;
     this.onLocalChange();
-  }
-
-  /** Records of the cache and the journal, as the browser kept them. */
-  load({ records = [], journal = [], ownerReminders = [] } = {}) {
-    for (const map of Object.values(this.maps)) map.clear();
-    for (const { kind, id, data } of records) {
-      if (!this.maps[kind]) continue;
-      const record = normalize(kind, data, id);
-      if (record) this.maps[kind].set(record.id, record);
-    }
-    this.journal.clear();
-    for (const entry of journal) this.journal.set(keyOf(entry.kind, entry.id), entry);
-    this.ownerRemindersMap.clear();
-    for (const [key, list] of ownerReminders) this.ownerRemindersMap.set(key, list);
-    this.changed(...KINDS);
   }
 
   /** The planner every device starts with: one calendar, never journaled. */
@@ -816,10 +795,7 @@ export class Store {
     for (const entry of sent) {
       const key = keyOf(entry.kind, entry.id);
       const current = this.journal.get(key);
-      if (current && current.modified <= entry.modified) {
-        this.journal.delete(key);
-        this.onJournal(key, null);
-      }
+      if (current && current.modified <= entry.modified) this.journal.delete(key);
     }
   }
 
@@ -829,12 +805,10 @@ export class Store {
 
   setOwnerReminders(kind, id, list) {
     this.ownerRemindersMap.set(keyOf(kind, id), list);
-    this.onMeta(`owner-reminders/${kind}/${id}`, list);
   }
 
   forgetOwnerReminders(kind, id) {
-    if (!this.ownerRemindersMap.delete(keyOf(kind, id))) return;
-    this.onMeta(`owner-reminders/${kind}/${id}`, null);
+    this.ownerRemindersMap.delete(keyOf(kind, id));
   }
 
   /**
@@ -923,29 +897,6 @@ export class Store {
 
     this.changed(...touched, Kind.calendar, Kind.event, Kind.task);
     this.announce();
-  }
-
-  /**
-   * Puts every record of the account into the journal again, for a server
-   * that lost what it had confirmed. Records of somebody else's calendars
-   * stay out: they are the owner's, and sent from here they would arrive as
-   * this member's stale edits.
-   */
-  republishAll() {
-    let count = 0;
-    for (const kind of KINDS) {
-      for (const record of this.maps[kind].values()) {
-        if ((kind === Kind.event || kind === Kind.task) && this.isForeignCalendar(record.calendarId)) continue;
-        if (kind === Kind.completion) {
-          const calendarId = this.task(record.taskId)?.calendarId ?? record.calendarId;
-          if (this.isForeignCalendar(calendarId)) continue;
-        }
-        this.track(kind, record.id);
-        ++count;
-      }
-    }
-    this.announce();
-    return count;
   }
 
   /** Records brought in from a backup or another planner, journaled like any edit. */

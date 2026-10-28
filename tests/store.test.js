@@ -192,17 +192,3 @@ test('the first sync drops untouched seeds when the account has calendars', () =
   store.applyRemote({ records: [{ kind: Kind.calendar, record: arriving }], removals: [] }, true);
   assert.deepEqual(store.calendars().map((c) => c.id), ['acc-cal']);
 });
-
-test('republishing leaves somebody else\'s records out', () => {
-  const store = fresh();
-  const twin = store.saveCalendar({ name: 'Чужой', ownerLogin: 'anna', originId: 'o', access: 'edit' });
-  store.saveEvent({ title: 'своё', start: '2026-10-28T10:00:00' });
-  store.tracking = false;
-  store.saveEvent({ id: 'foreign', title: 'чужое', calendarId: twin, start: '2026-10-28T10:00:00' });
-  store.tracking = true;
-  store.journal.clear();
-  store.republishAll();
-  assert.ok(!store.journal.has('event/foreign'));
-  assert.ok(store.journal.has(`calendar/${twin}`));
-  assert.ok(store.journal.has('calendar/default'));
-});
