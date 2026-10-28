@@ -1,0 +1,12 @@
+{
+  "name": "Космос календарь",
+  "short_name": "Космос",
+  "lang": "ru",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f5f6f8",
+  "theme_color": "#672fd7",
+  "icons": [
+    { "src": "img/logo.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

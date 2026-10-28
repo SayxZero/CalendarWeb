@@ -1,0 +1,29 @@
+# The site has no build: site/ is what is served, as it is. Nothing is
+# installed either - package.json only says "ES modules" to Node for the
+# tests - but a node_modules/ that someone made by hand stays out.
+node_modules/
+npm-debug.log*
+*.log
+
+# Test output
+coverage/
+.nyc_output/
+
+# IDE and editors
+.vs/
+.vscode/
+.idea/
+*.user
+*.swp
+*~
+
+# Working folders of the coding tools: scratch worktrees and machine-local
+# settings.
+.claude/
+.kilo/
+.kilocode/
+
+# OS junk
+.DS_Store
+Thumbs.db
+Desktop.ini

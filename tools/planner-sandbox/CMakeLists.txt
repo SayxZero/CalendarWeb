@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 3.16)
+project(seed-account LANGUAGES CXX)
+find_package(Qt6 REQUIRED COMPONENTS Core)
+add_executable(seed-account main.cpp)
+target_link_libraries(seed-account PRIVATE Qt6::Core)

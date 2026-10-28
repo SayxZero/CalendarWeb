@@ -1,0 +1,9 @@
+*.js text eol=lf
+*.css text eol=lf
+*.html text eol=lf
+*.json text eol=lf
+*.webmanifest text eol=lf
+*.md text
+*.svg text eol=lf
+# cmd.exe needs CRLF.
+*.bat text eol=crlf
