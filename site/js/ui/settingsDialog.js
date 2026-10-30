@@ -9,7 +9,7 @@ import { settings } from './settings.js';
 import { FIELDS, paletteToJson, paletteFromJson } from '../model/palette.js';
 import { formatReminder, reminderPresets } from '../model/reminders.js';
 import { TONES, Player, prepareMelody } from '../core/tones.js';
-import { api } from '../core/api.js';
+import { api, agentSessions } from '../core/api.js';
 import { manageCalendars, importCalendarFile, exportCalendar } from './calendars.js';
 import { newId, normalize, KINDS, toData } from '../model/records.js';
 import { now, dateOf } from '../model/dates.js';
@@ -33,7 +33,7 @@ export function openSettings(app, section = 'look') {
   const dialog = new Dialog({ title: 'Настройки', size: 'wide', closeLabel: 'Закрыть' });
   const sections = [
     ['look', 'Вид'], ['calendar', 'Календарь'], ['tasks', 'Задачи'], ['reminders', 'Напоминания'],
-    ['account', 'Аккаунт'], ['data', 'Данные'], ['about', 'О сайте'],
+    ['account', 'Аккаунт'], ['agents', 'ИИ-агенты'], ['data', 'Данные'], ['about', 'О сайте'],
   ];
   const nav = h('div', { class: 'settings-nav' });
   const body = h('div', { class: 'settings-section' });
@@ -91,6 +91,7 @@ export function openSettings(app, section = 'look') {
       h('div', { class: 'muted small' }, 'Сайт напоминает, пока его вкладка открыта. Будильник, выключенный здесь, не зазвонит и на других устройствах аккаунта.'),
     ],
     account: () => accountSection(app, dialog),
+    agents: () => agentsSection(),
     data: () => [
       h('div', { class: 'row wrap' },
         h('button', { class: 'btn', on: { click: () => importCalendarFile(app) } }, icon('import'), 'Импорт ICS…'),
@@ -246,6 +247,44 @@ function accountSection(app, dialog) {
       h('button', { class: 'btn', on: { click: () => changeName(app) } }, icon('user'), 'Изменить имя…'),
       h('button', { class: 'btn', on: { click: () => changePassword() } }, icon('lock'), 'Сменить пароль…')),
     h('button', { class: 'btn danger', style: { alignSelf: 'flex-start' }, on: { click: () => { dialog.close(null); app.signOut(); } } }, icon('logout'), 'Выйти из аккаунта'),
+  ];
+}
+
+/** A moment of the server, which keeps them in UTC, as the clock on this device shows it. */
+function sessionTime(iso) {
+  const moment = new Date(iso);
+  return Number.isNaN(moment.getTime()) ? '—' : moment.toLocaleString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+/** The agents connected to the account: asked of the server every time, none of it is kept here. */
+function agentsSection() {
+  const list = h('div', { class: 'col', style: { gap: '2px' } }, h('div', { class: 'muted small' }, 'Загружаем список…'));
+  const load = async () => {
+    const result = await api.sessions();
+    if (!result.ok) {
+      list.replaceChildren(h('div', { class: 'error' }, result.error));
+      return;
+    }
+    const agents = agentSessions(result.body?.sessions);
+    list.replaceChildren(...(agents.length ? agents.map(row) : [h('div', { class: 'empty' }, 'Сейчас ни один агент не подключён')]));
+  };
+  const disconnect = async (agent) => {
+    if (!await confirm({ title: 'Отключить агента?', text: `«${agent.name}» потеряет доступ к аккаунту при следующем же вызове. Подключить его снова можно будет только с паролем.`, ok: 'Отключить', danger: true })) return;
+    const result = await api.revokeSession(agent.id);
+    // Not found means it has ended already, and that is what was asked for.
+    if (result.ok || result.status === 404) toast(`Агент «${agent.name}» отключён`);
+    else toast(result.error);
+    await load();
+  };
+  const row = (agent) => h('div', { class: 'line' },
+    h('div', { class: 'body', style: { cursor: 'default' } },
+      h('div', { class: 'title' }, agent.name || 'ИИ-агент'),
+      h('div', { class: 'sub' }, h('span', null, `Подключён: ${sessionTime(agent.createdAt)}`), h('span', null, `Последний запрос: ${sessionTime(agent.lastUsedAt)}`))),
+    h('button', { class: 'btn danger', on: { click: () => disconnect(agent) } }, 'Отключить'));
+  load();
+  return [
+    h('div', { class: 'muted small' }, 'Агенты, вошедшие в ваш аккаунт со страницы подключения. Правки, которые агент уже сделал, останутся.'),
+    list,
   ];
 }
 

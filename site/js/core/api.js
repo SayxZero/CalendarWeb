@@ -77,6 +77,8 @@ export const api = {
   logout: () => request('POST', '/api/logout', {}),
   profile: (displayName) => request('POST', '/api/profile', { displayName }),
   password: (oldPassword, newPassword) => request('POST', '/api/password', { oldPassword, newPassword }),
+  sessions: () => request('GET', '/api/sessions'),
+  revokeSession: (id) => request('POST', '/api/sessions/revoke', { id }),
   sync: (body, { keepalive = false } = {}) => request('POST', '/api/sync', body, { timeoutMs: 60000, keepalive }),
   record: (kind, id, timeoutMs = 2500) =>
     request('GET', `/api/record?kind=${encodeURIComponent(kind)}&id=${encodeURIComponent(id)}`, undefined, { timeoutMs }),
@@ -90,6 +92,19 @@ export const api = {
   shareJoin: (token, twinId) => request('POST', '/api/share/join', { token, twinId }, { timeoutMs: 60000 }),
   shareLeave: (twinId) => request('POST', '/api/share/leave', { twinId }, { timeoutMs: 60000 }),
 };
+
+const AGENT_PREFIX = 'ИИ-агент · ';
+
+/**
+ * The sessions of AI agents among those of the account, each with the name of its
+ * client. The server knows no agents: the word is in the name the site backend
+ * gives such a session (CalendarWebServer, McpOAuth).
+ */
+export function agentSessions(sessions) {
+  return (sessions || [])
+    .filter((session) => session.device?.startsWith(AGENT_PREFIX))
+    .map((session) => ({ ...session, name: session.device.slice(AGENT_PREFIX.length) }));
+}
 
 /** "Сайт · Firefox на Windows": the name the server shows for this session. */
 export function deviceName() {
