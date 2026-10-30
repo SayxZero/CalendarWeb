@@ -21,7 +21,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Тесты
 
 ```bash
-node --test "tests/*.test.js"     # или npm test; 59 тестов
+node --test "tests/*.test.js"     # или npm test; 62 теста
 ```
 
 `node --test tests/` (каталог) Node 24 не принимает — только маска.

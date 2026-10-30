@@ -158,11 +158,6 @@ export async function freshServers() {
       '-c', 'Release', '-v', 'quiet', '-nologo', '-o', path.join(WORK, 'webbin')], { env: { ...process.env, DOTNET_CLI_TELEMETRY_OPTOUT: '1', DOTNET_NOLOGO: '1' } });
   }
   fs.mkdirSync(path.join(WORK, 'site-data'), { recursive: true });
-  // The card of Android on the page wants a file. This one is the test build, for this site only.
-  const version = (fs.readFileSync(path.join(ROOT, 'Calendar/CMakeLists.txt'), 'utf8').match(/VERSION (\d+\.\d+\.\d+)/g) || []).pop()?.split(' ')[1];
-  const apk = path.join(ROOT, 'Calendar/release/CalendarPlanner-signed.apk');
-  const target = path.join(WORK, 'site-data', `CosmosCalendar-${version}.apk`);
-  if (version && fs.existsSync(apk) && !fs.existsSync(target)) fs.copyFileSync(apk, target);
   siteProcess = background(webServer, ['--host', '127.0.0.1', '-p', String(cfg.sitePort), '-u', serverAddress,
     '-w', SITE, '-d', path.join(WORK, 'site-data')], { detached: true });
   siteProcess.unref();

@@ -281,6 +281,21 @@ a:focus-visible {
   color: var(--muted);
 }
 
+/* Files to take away, under the words of a feature. */
+.feature .feature-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin-top: 14px;
+}
+
+.feature-links a {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.feature-links a:hover { color: var(--accent-hover); }
+
 /* A recording of the real interface; pressed, it opens large. */
 .shot {
   display: block;

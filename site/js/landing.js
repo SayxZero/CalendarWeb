@@ -1,9 +1,9 @@
 import { priceValue, yearPerMonth, yearSaving } from './landingPrices.js';
 
 // The presentation page (site/index.html). Three small jobs, no framework:
-// an old share link of the planner goes on to the planner, the legal details,
-// the prices and the file for Android come from the site server, and the videos
-// play while they are on the screen.
+// an old share link of the planner goes on to the planner, the legal details
+// and the prices come from the site server, and the videos play while they are
+// on the screen.
 
 // The planner moved to app/; a link "<site>/#join=<token>" made before that
 // still has to open the calendar it shares.
@@ -51,22 +51,6 @@ async function showLegal() {
   if (!items.length) return;
   list.replaceChildren(...items);
   footer.hidden = false;
-}
-
-/** The version for Android is whatever file the site server has; without one, "Скоро" stays. */
-async function showDownloads() {
-  let android = null;
-  try {
-    const response = await fetch('web/downloads', { headers: { Accept: 'application/json' }, cache: 'no-cache' });
-    if (response.ok) ({ android } = await response.json());
-  } catch {
-    return;
-  }
-  if (!android) return;
-  document.getElementById('android-version').textContent = `Версия ${android.version}`;
-  const button = document.getElementById('android-download');
-  button.href = android.url;
-  button.hidden = false;
 }
 
 /**
@@ -145,7 +129,6 @@ function openVideosLarge() {
 }
 
 showLegal();
-showDownloads();
 showPrices();
 playVideosInView();
 openVideosLarge();

@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="referrer" content="no-referrer">
+  <meta name="robots" content="noindex">
+  <title>Подключение ИИ-агента — Космос календарь</title>
+  <link rel="icon" href="../img/logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../css/landing.css">
+  <link rel="stylesheet" href="../css/connect.css">
+  <script type="module" src="../js/connect.js"></script>
+</head>
+<body class="connect">
+  <main class="connect-card">
+    <img class="connect-logo" src="../img/logo.svg" alt="" width="56" height="56">
+    <h1>Подключение ИИ-агента</h1>
+    <p class="connect-lead" id="connect-lead">Загружаем запрос…</p>
+
+    <form id="connect-form" hidden>
+      <p class="connect-who"><strong id="connect-client"></strong> просит доступ к вашему календарю. Ответ уйдёт на <strong id="connect-host"></strong>.</p>
+      <label class="connect-field">Логин
+        <input id="connect-login" name="login" autocomplete="username" autocapitalize="none" spellcheck="false" required>
+      </label>
+      <label class="connect-field">Пароль
+        <input id="connect-password" name="password" type="password" autocomplete="current-password" required>
+      </label>
+      <label class="connect-check">
+        <input id="connect-writes" type="checkbox" checked>
+        Разрешить агенту изменять события, задачи и привычки
+      </label>
+      <p class="connect-note">Агент сможет читать все записи аккаунта. Пароль останется на этом сайте: агент его не получит. Если адрес или название агента вам незнакомы, не продолжайте.</p>
+      <p class="connect-error" id="connect-error" role="alert" hidden></p>
+      <div class="connect-actions">
+        <button class="connect-allow" id="connect-allow" type="submit">Разрешить</button>
+        <button class="connect-deny" id="connect-deny" type="button">Отказать</button>
+      </div>
+    </form>
+  </main>
+</body>
+</html>
