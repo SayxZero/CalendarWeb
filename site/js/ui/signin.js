@@ -1,7 +1,7 @@
 // Sign in and sign up: the accounts of the sync server, the same as in the
 // planner's account panel.
 
-import { h, clear } from './dom.js';
+import { h, clear, asset } from './dom.js';
 import { field } from './dialog.js';
 import { api, deviceName } from '../core/api.js';
 
@@ -61,7 +61,7 @@ export function signIn(root, { serverAddress = '', login = '', message = '' } = 
       again.value = '';
       resolve(result.body.user);
     } } },
-    h('img', { class: 'logo', src: 'img/logo.svg', alt: '' }),
+    h('img', { class: 'logo', src: asset('img/logo.svg'), alt: '' }),
     h('h1', null, 'Космос календарь'),
     h('div', { class: 'lead' }, 'Войдите в аккаунт сервера синхронизации — здесь будут те же события и задачи, что в планере'),
     field('Логин', loginInput),

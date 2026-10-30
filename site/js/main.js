@@ -12,7 +12,7 @@ import { AlarmUi } from './ui/alarmUi.js';
 import { signIn } from './ui/signin.js';
 import { settings } from './ui/settings.js';
 import { applyPalette } from './ui/theme.js';
-import { h, clear, icon } from './ui/dom.js';
+import { h, clear, icon, asset } from './ui/dom.js';
 
 const root = document.getElementById('app');
 let running = null;
@@ -24,7 +24,7 @@ function loading(text) {
 /** The server does not answer: say so and let the user try again. */
 function unavailable(message) {
   clear(root).append(h('div', { class: 'signin' }, h('div', { class: 'signin-card' },
-    h('img', { class: 'logo', src: 'img/logo.svg', alt: '' }),
+    h('img', { class: 'logo', src: asset('img/logo.svg'), alt: '' }),
     h('h1', null, 'Сервер недоступен'),
     h('div', { class: 'lead' }, message || 'Сервер синхронизации не отвечает'),
     h('button', { class: 'btn primary', style: { minHeight: '44px' }, on: { click: () => location.reload() } }, 'Повторить'))));

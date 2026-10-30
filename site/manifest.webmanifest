@@ -2,7 +2,7 @@
   "name": "Космос календарь",
   "short_name": "Космос",
   "lang": "ru",
-  "start_url": "./",
+  "start_url": "app/",
   "display": "standalone",
   "background_color": "#f5f6f8",
   "theme_color": "#672fd7",

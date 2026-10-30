@@ -2,18 +2,187 @@
 <html lang="ru">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#ffffff">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light dark">
   <meta name="referrer" content="no-referrer">
-  <title>Космос календарь</title>
+  <meta name="description" content="Космос календарь — календарь, задачи, привычки и напоминания на компьютере, телефоне и в браузере.">
+  <title>Космос календарь — приведите дела в порядок</title>
+  <meta property="og:title" content="Космос календарь — приведите дела в порядок">
+  <meta property="og:description" content="Календарь, задачи, привычки и напоминания на компьютере, телефоне и в браузере.">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="img/og.png">
+  <meta name="twitter:card" content="summary_large_image">
   <link rel="icon" href="img/logo.svg" type="image/svg+xml">
-  <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="css/app.css">
-  <script type="module" src="js/main.js"></script>
+  <link rel="stylesheet" href="css/landing.css">
+  <script type="module" src="js/landing.js"></script>
 </head>
 <body>
-  <div id="app"></div>
-  <noscript>Для работы сайта нужен JavaScript.</noscript>
+  <header class="top">
+    <div class="wrap top-row">
+      <a class="brand" href="./"><img src="img/logo.svg" alt="" width="28" height="28">Космос календарь</a>
+      <nav class="top-nav">
+        <a class="link" href="#features">Возможности</a>
+        <a class="btn" href="app/">Открыть планер</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero" aria-labelledby="title">
+      <video class="hero-video" src="video/hero.mp4" poster="video/hero.jpg" muted loop playsinline preload="metadata" aria-hidden="true" tabindex="-1"></video>
+      <div class="wrap hero-inner">
+        <h1 id="title">Космос календарь</h1>
+        <p class="slogan">Приведите дела в порядок</p>
+        <ul class="cards">
+          <li class="card">
+            <img src="img/icons/android.png" alt="" width="56" height="56">
+            <div class="card-body">
+              <h2>Android</h2>
+              <p class="card-note" id="android-version">Скоро</p>
+              <a class="btn card-action" id="android-download" href="web/download/android" hidden>Скачать</a>
+            </div>
+          </li>
+          <li class="card">
+            <img src="img/icons/web.png" alt="" width="56" height="56">
+            <div class="card-body">
+              <h2>Web</h2>
+              <p class="card-note">В браузере, без установки</p>
+              <a class="btn card-action" href="app/">Открыть</a>
+            </div>
+          </li>
+          <li class="card">
+            <img src="img/icons/desktop.png" alt="" width="56" height="56">
+            <div class="card-body">
+              <h2>Desktop</h2>
+              <p class="card-note">Windows</p>
+              <span class="card-status">В разработке</span>
+            </div>
+          </li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="features" class="features wrap" aria-labelledby="features-title">
+      <h2 id="features-title">Возможности</h2>
+
+      <article class="feature">
+        <button class="shot" type="button" aria-label="Открыть ролик крупнее"><video src="video/calendars.mp4" poster="video/calendars.jpg" muted loop playsinline preload="none"></video></button>
+        <div class="feature-text">
+          <h3>Календари и списки задач в одном месте</h3>
+          <p>События по дням, неделям и месяцам — рядом с задачами, подзадачами и привычками.</p>
+        </div>
+      </article>
+
+      <article class="feature">
+        <button class="shot" type="button" aria-label="Открыть ролик крупнее"><video src="video/sharing.mp4" poster="video/sharing.jpg" muted loop playsinline preload="none"></video></button>
+        <div class="feature-text">
+          <h3>Серверная синхронизация календарей: поделитесь календарём с другим пользователем</h3>
+          <p>Отправьте ссылку — и календарь появится у другого человека: только для чтения или с правом правки.</p>
+        </div>
+      </article>
+
+      <article class="feature">
+        <button class="shot" type="button" aria-label="Открыть ролик крупнее"><video src="video/devices.mp4" poster="video/devices.jpg" muted loop playsinline preload="none"></video></button>
+        <div class="feature-text">
+          <h3>Один сервис для всех устройств</h3>
+          <p>Планер на компьютере, на телефоне и в браузере работает с одним аккаунтом и одними записями.</p>
+        </div>
+      </article>
+
+      <article class="feature feature-phone">
+        <button class="shot shot-phone" type="button" aria-label="Открыть ролик крупнее"><video src="video/palette.mp4" poster="video/palette.jpg" muted loop playsinline preload="none"></video></button>
+        <div class="feature-text">
+          <h3>Ваш календарь — ваш стиль. Настройте палитру приложения под себя!</h3>
+          <p>Светлые и тёмные палитры на выбор, а любую из них можно поменять по цветам.</p>
+        </div>
+      </article>
+
+      <article class="feature feature-phone">
+        <button class="shot shot-phone" type="button" aria-label="Открыть ролик крупнее"><video src="video/task-check.mp4" poster="video/task-check.jpg" muted loop playsinline preload="none"></video></button>
+        <div class="feature-text">
+          <h3>Забываете свериться со списком задач? Календарь напомнит!</h3>
+          <p>Время от времени планер пришлёт уведомление и покажет число открытых задач — пора закрыть сделанное и поправить сроки.</p>
+        </div>
+      </article>
+
+      <article class="feature">
+        <button class="shot" type="button" aria-label="Открыть ролик крупнее"><video src="video/alarm.mp4" poster="video/alarm.jpg" muted loop playsinline preload="none"></video></button>
+        <div class="feature-text">
+          <h3>Простого уведомления недостаточно? Напоминание прозвонит как будильник!</h3>
+          <p>Любое напоминание можно сделать будильником — со своей мелодией, отсрочкой и нарастающей громкостью.</p>
+        </div>
+      </article>
+
+      <article class="feature feature-phone">
+        <button class="shot shot-phone" type="button" aria-label="Открыть ролик крупнее"><video src="video/melody.mp4" poster="video/melody.jpg" muted loop playsinline preload="none"></video></button>
+        <div class="feature-text">
+          <h3>Установите свою мелодию на будильник</h3>
+          <p>Выберите файл с музыкой на устройстве — добавленная мелодия будет доступна на всех устройствах.</p>
+        </div>
+      </article>
+
+      <article class="feature">
+        <button class="shot" type="button" aria-label="Открыть ролик крупнее"><video src="video/same-alarms.mp4" poster="video/same-alarms.jpg" muted loop playsinline preload="none"></video></button>
+        <div class="feature-text">
+          <h3>Одинаковые будильники на всех устройствах</h3>
+          <p>Выключили будильник на телефоне — он не зазвонит и на компьютере.</p>
+        </div>
+      </article>
+
+      <article class="feature">
+        <button class="shot" type="button" aria-label="Открыть ролик крупнее"><video src="video/ai-agent.mp4" poster="video/ai-agent.jpg" muted loop playsinline preload="none"></video></button>
+        <div class="feature-text">
+          <h3>Не любите заполнять календарь самостоятельно? Попросите своего ИИ агента!</h3>
+          <p>Расскажите о планах своими словами — агент составит файл календаря, а планер добавит всё из него за одно нажатие.</p>
+        </div>
+      </article>
+    </section>
+
+    <section class="access" aria-labelledby="access-title">
+      <div class="wrap access-inner">
+        <h2 id="access-title">Уровни доступа</h2>
+        <ul class="plans">
+        <li class="plan">
+          <p class="plan-label">Бесплатно</p>
+          <span class="plan-badge">На месяц</span>
+          <h3>Попробовать бесплатно</h3>
+          <p class="plan-note">Весь планер без оплаты</p>
+          <a class="plan-action" href="app/">Попробовать</a>
+          <p class="plan-price"><span class="plan-amount" id="price-free">0 ₽</span><span class="plan-per-month" id="free-then">на месяц</span></p>
+        </li>
+        <li class="plan">
+          <p class="plan-label">Месяц</p>
+          <h3>Полная версия</h3>
+          <p class="plan-note">С оплатой раз в месяц</p>
+          <span class="plan-action plan-action-off">Оплата в разработке</span>
+          <p class="plan-price"><span class="plan-amount is-empty" id="price-month">Цена появится позже</span> <span class="plan-period" hidden>/ месяц</span></p>
+        </li>
+        <li class="plan plan-best">
+          <p class="plan-label">Год</p>
+          <span class="plan-badge" id="year-saving" hidden></span>
+          <h3>Полная версия</h3>
+          <p class="plan-note">С оплатой раз в год</p>
+          <span class="plan-action plan-action-off">Оплата в разработке</span>
+          <p class="plan-price"><span class="plan-amount is-empty" id="price-year">Цена появится позже</span> <span class="plan-period" hidden>/ год</span><span class="plan-per-month" id="year-per-month" hidden></span></p>
+        </li>
+        </ul>
+      </div>
+    </section>
+  </main>
+
+  <dialog class="viewer" aria-label="Ролик">
+    <button class="viewer-close" type="button" aria-label="Закрыть">×</button>
+    <video controls muted loop playsinline></video>
+  </dialog>
+
+  <footer class="legal" hidden>
+    <div class="wrap legal-row">
+      <div class="legal-details">
+        <h2>Юридическая информация</h2>
+        <ul class="legal-list"></ul>
+      </div>
+      <a class="legal-brand" href="./"><img src="img/logo.svg" alt="" width="56" height="56">Космос календарь</a>
+    </div>
+  </footer>
 </body>
 </html>

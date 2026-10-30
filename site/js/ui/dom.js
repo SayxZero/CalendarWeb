@@ -68,6 +68,14 @@ for (const name of ['append', 'prepend', 'replaceChildren']) {
   };
 }
 
+/**
+ * A file of the site by its path from the site's root ("img/logo.svg"),
+ * whichever page asks: the planner lives at app/, the presentation at the root.
+ */
+export function asset(path) {
+  return new URL(`../../${path}`, import.meta.url).href;
+}
+
 export function icon(name, className = '') {
   const span = document.createElement('span');
   span.innerHTML = `<svg class="icon ${className}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ''}</svg>`;

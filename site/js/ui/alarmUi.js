@@ -3,7 +3,7 @@
 // for an alarm clock - «Отложить» and «Выключить», as the planner's
 // AlarmWindow. Switched off here, it stays off on every device.
 
-import { h, icon, toast } from './dom.js';
+import { h, icon, toast, asset } from './dom.js';
 import { settings } from './settings.js';
 import { Player } from '../core/tones.js';
 import { hhmm } from '../model/dates.js';
@@ -35,7 +35,7 @@ export class AlarmUi {
     const body = [hit.subtitle, hit.kind === 'reminder' ? '' : ''].filter(Boolean).join('\n');
     if (globalThis.Notification && Notification.permission === 'granted') {
       try {
-        const note = new Notification(hit.title, { body, tag: hit.key, icon: 'img/logo.svg' });
+        const note = new Notification(hit.title, { body, tag: hit.key, icon: asset('img/logo.svg') });
         note.onclick = () => {
           window.focus();
           this.open(hit);
