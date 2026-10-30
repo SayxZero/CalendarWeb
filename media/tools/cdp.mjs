@@ -18,6 +18,9 @@
 //   save NAME JS          keeps a value; \${NAME} is replaced in the lines below
 //   paste TEXT            insertText all at once
 //   clicktext TEXT        the last visible button or link with this text
+//   feed FILE FUNCTION    FUNCTION(line) of the page for each line someone adds to
+//                         FILE, one after the other, up to a line "end". FILE.ready
+//                         appears when it starts listening
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -174,8 +177,24 @@ async function stopRecording() {
       '-pix_fmt', 'yuv420p', path.resolve(recording.out)], { cwd: dir, stdio: 'inherit' });
     ff.on('exit', (code) => (code === 0 ? resolve() : reject(new Error(`ffmpeg ${code}`))));
   });
+  // The moment of the first frame, for takes that have to go with another one.
+  if (frames.length) fs.writeFileSync(recording.out.replace(/\.mp4$/, '.stamp'), String(Math.round(frames[0].at * 1000)));
   log(`recorded ${frames.length} frames to ${recording.out}`);
   recording = null;
+}
+
+async function feed(file, fn) {
+  fs.writeFileSync(`${file}.ready`, '');
+  let taken = 0;
+  for (;;) {
+    const lines = fs.readFileSync(file, 'utf8').split('\n');
+    lines.pop();  // what comes after the last line break is still being written
+    for (; taken < lines.length; taken++) {
+      if (lines[taken] === 'end') return;
+      await evaluate(`${fn}(${JSON.stringify(lines[taken])})`);
+    }
+    await sleep(30);
+  }
 }
 
 async function main() {
@@ -237,6 +256,7 @@ async function main() {
         if (!at) { log('no text', arg); break; }
         await click(at[0], at[1]); break;
       }
+      case 'feed': await feed(rest[0], rest[1]); break;
       case 'record': await startRecording(rest[0], Number(rest[1] || 30)); break;
       case 'stop': await stopRecording(); break;
       case 'shot': {

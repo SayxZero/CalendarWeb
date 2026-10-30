@@ -3,10 +3,11 @@
 // after any update. Coordinates are screen pixels: on the PC the planner window
 // stands at a known place at 125 %, the phone has 720x1600. When the interface
 // moves, these numbers are what changes (README.md, "Если съехали нажатия").
+import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import {
-  MEDIA, RAW, WORK, browser, cfg, desk, ffmpeg, freshAccount, log, meta, password, phone, register, run, siteUrl, sleep, wdrive,
+  AGENT_CHAT, MEDIA, RAW, WORK, browser, cfg, desk, ffmpeg, freshAccount, log, meta, password, phone, recordsOn, register, siteUrl, sleep, wdrive,
 } from './lib.mjs';
 
 const backdrop = path.join(MEDIA, 'art/backdrop.png');
@@ -18,6 +19,10 @@ const P = {
   next: [239, 78], today: [600, 78], taskCircle: [1096, 508], habitCircle: [1102, 250],
 };
 const click = ([x, y]) => `click ${x} ${y}`;
+
+// The agent's frame: the chat on the left, the window of the planner beside it.
+const AGENT_WINDOW = '572 0 1000 855';
+const AGENT_P = { week: [651, 337], sidebar: [616, 67], next: [738, 67], grid: [880, 480], dayPanel: [1214, 480] };
 
 const deskHeader = (pid, region = '0 -40 1600 1000', size = '1280 800') => `pid ${pid}
 region ${region}
@@ -345,59 +350,128 @@ stop
     log(`the PC stopped ${((ended - 2500 - dismissed) / 1000).toFixed(0)} s after the phone`);
   },
 
-  // Asking an agent: a real Codex writes a real file, its words are shown on a
-  // plain chat page, and the site imports that file.
+  // An agent at work in the planner: a real Codex with the real bridge, on a
+  // sandbox. Nothing is staged: the planner's window and the chat page are taken
+  // at once while it works, the page gets its calls as they happen, and the
+  // pauses while it thinks are cut from both later (videos.mjs).
   async agent() {
-    await freshAccount();
-    desk.stop();
+    const anna = await freshAccount({ agent: true, window: AGENT_WINDOW });
+    const before = await recordsOn(anna.token);
     const dir = path.join(WORK, 'agent');
     fs.rmSync(dir, { recursive: true, force: true });
     fs.mkdirSync(dir, { recursive: true });
-    const today = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
-    const request = 'Составь мой план на следующую неделю: в понедельник в 9:30 зубной, во вторник в 19:00 бассейн, ' +
-      'в среду в 12:00 обед с Сергеем, в пятницу в 18:00 поход в театр. Сохрани его файлом plan.ics, название календаря — Планы.';
-    // The date and the shape of the answer are for the agent, the page shows the request.
-    run('cmd', ['/c', 'codex', 'exec', '--skip-git-repo-check', '--color', 'never', '-s', 'workspace-write', '-m', cfg.codexModel,
-      '-o', 'reply.txt', `Сегодня ${today}. ${request} В ответе одной фразой скажи, сколько встреч ты записал, без ссылок.`],
-    { cwd: dir, input: '', timeout: 300000 });
-    const ics = path.join(dir, 'plan.ics');
-    if (!fs.existsSync(ics)) throw new Error('the agent wrote no plan.ics');
-    const reply = fs.readFileSync(path.join(dir, 'reply.txt'), 'utf8').replace(/\[([^\]]+)\]\([^)]*\)/g, '$1').replace(/[`*]/g, '').replace(/\s+/g, ' ').trim();
-    log(`the agent: ${reply}`);
+    const events = path.join(dir, 'events.txt'), finished = path.join(dir, 'finished');
+    fs.writeFileSync(events, '');
+    const deskStamp = path.join(RAW, 'agent-desk.stamp');
+    fs.rmSync(deskStamp, { force: true });
+    const deskTake = wdrive('agent-desk', `${deskHeader(desk.pid, '0 -70 1600 1000')}pointer off
+${click(AGENT_P.week)}
+wait 700
+${click(AGENT_P.week)}
+wait 1000
+${click(AGENT_P.sidebar)}
+wait 800
+${click(AGENT_P.next)}
+wait 1000
+drag ${AGENT_P.dayPanel.join(' ')} 1500 ${AGENT_P.dayPanel[1]} 400
+wait 500
+wheel ${AGENT_P.grid.join(' ')} -120
+wait 300
+wheel ${AGENT_P.grid.join(' ')} -120
+wait 1200
+record ${path.join(RAW, 'agent-desk.mp4')}
+stamp ${deskStamp}
+waitfile 180000 ${finished}
+stop
+`, { wait: false });
+    while (!fs.existsSync(deskStamp)) await sleep(50);
+
+    // «Дочитать книгу» is a demo task six days ahead: in the next week unless the take is on a Monday.
+    const request = 'Посмотри мою следующую неделю. Если время свободно, поставь во вторник в 17:00 бассейн, а в четверг в 12:00 обед с Сергеем, ' +
+      'о каждом напомни за час. К пятнице добавь задачу купить цветы, а «Дочитать книгу» отметь выполненной.';
     const page = `file:///${path.join(MEDIA, 'agent/index.html').replaceAll('\\', '/')}`;
-    browser('agent-chat', `size 1280 800
+    const chat = browser('agent-chat', `size ${AGENT_CHAT.w} ${AGENT_CHAT.h}
 pointer off
 goto ${page}
 wait 500
 pointer on
-point 900 620 0
+point 300 ${AGENT_CHAT.h - 120} 0
 record ${path.join(RAW, 'agent-chat.mp4')} 30
 wait 900
 clicksel textarea
 wait 300
-typefast 16 ${request}
-wait 700
+typefast 4 ${request}
+wait 600
 clicksel #send
-wait 2200
-eval reply(${JSON.stringify(reply)}, 'plan.ics'); 1
+wait 200
+pointer off
+feed ${events} agentEvent
 wait 4500
 stop
-`);
-    browser('agent-import', `${signIn('anna', 'sky')}clicksel [title="Вперёд"]
-wait 800
-pointer on
-point 700 420 0
-record ${path.join(RAW, 'agent-import.mp4')} 30
-wait 1200
-click 254 728
-wait 1200
-choosefile ${ics}
-clicktext Импорт ICS
-wait 3000
-clicktext Закрыть
-wait 3000
-stop
-`);
+`, { wait: false });
+    const chatEnded = new Promise((resolve) => chat.on('exit', resolve));
+    while (!fs.existsSync(`${events}.ready`)) await sleep(50);
+    const sent = Date.now();
+
+    // The answer's shape and "use the bridge" are for the agent, the page shows the request.
+    const toml = (text) => JSON.stringify(text.replaceAll('\\', '/'));
+    const agent = spawn('cmd', ['/c', 'codex', 'exec', '--ignore-user-config', '--skip-git-repo-check', '--json', '--color', 'never',
+      '-s', 'read-only', '-m', cfg.codexModel,
+      '-c', `mcp_servers.cosmos.command=${toml(path.join(path.dirname(cfg.planner), 'CalendarPlannerMcp.exe'))}`,
+      '-c', `mcp_servers.cosmos.args=["--data-dir",${toml(desk.folder)},"--no-start"]`,
+      '-c', 'mcp_servers.cosmos.default_tools_approval_mode="approve"',
+      '-c', 'approval_policy="never"',
+      `${request} Новые записи клади в «Мой календарь», расписание смотри по всем календарям. Работай только инструментами MCP cosmos и вызывай их строго по одному, не параллельно. Пока работаешь, ничего не пиши. ` +
+      'В конце ответь двумя короткими ясными фразами, не больше 25 слов, без разметки: всё ли сделано и было ли свободно это время.'],
+    { cwd: dir, stdio: ['ignore', 'pipe', 'ignore'] });
+    const marks = [];
+    const tell = (event, hold) => {
+      marks.push({ at: Date.now(), hold });
+      fs.appendFileSync(events, `${JSON.stringify(event)}\n`);
+    };
+    let pending = null, rest = '', wrote = 0;
+    const take = (item, started) => {
+      if (item.type === 'mcp_tool_call' && started) {
+        tell({ type: 'call', id: item.id, tool: item.tool, args: item.arguments }, 0.9);
+      } else if (item.type === 'mcp_tool_call') {
+        let result = {};
+        try { result = JSON.parse(item.result.content[0].text); } catch { /* no answer to read: the row only says how it went */ }
+        const ok = item.status === 'completed' && !result.error;
+        if (ok && /^(create|set)_/.test(item.tool)) wrote++;
+        log(`  ${item.tool} ${JSON.stringify(item.arguments)} ${ok ? '' : JSON.stringify(item.error || result.error)}`);
+        tell({ type: 'done', id: item.id, ok, title: (result.task || result.event)?.title }, 0.9);
+      } else if (item.type === 'agent_message') {
+        // Held back a moment: only the next line knows whether this one is the last.
+        if (pending) tell({ type: 'say', text: pending }, pending.split(' ').length * 0.045 + 1);
+        pending = item.text.replace(/\s+/g, ' ').trim();
+      }
+    };
+    agent.stdout.on('data', (data) => {
+      const lines = (rest + data).split('\n');
+      rest = lines.pop();
+      for (const line of lines) {
+        let message;
+        try { message = JSON.parse(line); } catch { continue; }
+        if (message.type === 'item.started' || message.type === 'item.completed') take(message.item, message.type === 'item.started');
+      }
+    });
+    const code = await new Promise((resolve) => agent.on('exit', resolve));
+    if (!pending) throw new Error(`the agent said nothing, its code ${code}`);
+    log(`the agent: ${pending}`);
+    const last = Date.now();
+    fs.appendFileSync(events, `${JSON.stringify({ type: 'say', text: pending, last: true })}\nend\n`);
+    await chatEnded;
+    fs.writeFileSync(finished, '');
+    await new Promise((resolve) => deskTake.on('exit', resolve));
+    await sleep(3000);
+    const after = await recordsOn(anna.token);
+    log(`records on the server: ${before} -> ${after}`);
+    if (wrote < 4 || after <= before) throw new Error(`the agent changed too little: ${wrote} writes, ${before} -> ${after} on the server`);
+    meta.write('agent', {
+      deskStart: Number(fs.readFileSync(deskStamp, 'utf8')),
+      chatStart: Number(fs.readFileSync(path.join(RAW, 'agent-chat.stamp'), 'utf8')),
+      sent, marks, last,
+    });
   },
 
   // The same account on three devices, for the screens of the Blender scene.

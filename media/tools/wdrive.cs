@@ -488,6 +488,13 @@ static class Program
             case "stamp":
                 File.WriteAllText(rest, ((long)(DateTime.UtcNow - new DateTime(1970, 1, 1)).TotalMilliseconds).ToString());
                 break;
+            case "waitfile": {
+                // until another program has made this file, or the limit in ms
+                var clockFile = Stopwatch.StartNew();
+                string waited = string.Join(" ", a, 1, a.Length - 1);
+                while (clockFile.ElapsedMilliseconds < int.Parse(a[0]) && !File.Exists(waited)) Thread.Sleep(100);
+                break;
+            }
             case "waitclosed": {
                 // until the process has no windows left, or the limit in ms
                 var clockClosed = Stopwatch.StartNew();

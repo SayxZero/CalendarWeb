@@ -2,7 +2,7 @@
 // encoding: nothing here needs a device, so a new cut takes seconds.
 import fs from 'node:fs';
 import path from 'node:path';
-import { RAW, RENDER, SITE, cfg, duration, ffmpeg, meta, run } from './lib.mjs';
+import { AGENT_CHAT, RAW, RENDER, SITE, cfg, duration, ffmpeg, meta, run } from './lib.mjs';
 
 const out = (name) => path.join(SITE, 'video', `${name}.mp4`);
 const raw = (name) => path.join(RAW, name);
@@ -100,13 +100,34 @@ export const videos = {
     ffmpeg('-i', path.join(RENDER, 'same-alarms.mp4'), ...encode(25), out('same-alarms'));
   },
 
-  // The request is typed, the answer comes, the file goes into the planner.
+  // The chat over the planner's take, both on one clock from the first frame of
+  // the chat. Only the agent's silences are cut: a call and what it changed in the
+  // planner stay together, because both takes lose the same moments.
   'ai-agent'() {
-    const chat = raw('agent-chat.mp4'), site = raw('agent-import.mp4');
-    const first = duration(chat);
-    ffmpeg('-i', chat, '-i', site, '-filter_complex',
-      `[0:v]fps=${FPS}[a];[1:v]fps=${FPS},trim=start=0.6,setpts=PTS-STARTPTS[b];` +
-      `[a][b]xfade=transition=fade:duration=0.5:offset=${first - 0.5}[v]`, '-map', '[v]', ...encode(), out('ai-agent'));
+    const { deskStart, chatStart, sent, marks, last } = meta.read('agent');
+    const chat = raw('agent-chat.mp4');
+    const seconds = (moment) => (moment - chatStart) / 1000;
+    const { w, h, x, y } = AGENT_CHAT;
+    // The moments of the agent, and how long each one has to stay on the screen.
+    const beats = [{ at: seconds(sent), hold: 0.8 }, ...marks.map((m) => ({ at: seconds(m.at), hold: m.hold })), { at: seconds(last), hold: 0 }];
+    const parts = [];
+    let from = 0.3;
+    for (let i = 0; i + 1 < beats.length; i++) {
+      const until = beats[i].at + beats[i].hold, next = beats[i + 1].at - 0.25;
+      if (next > until + 0.5) {
+        parts.push([from, until]);
+        from = next;
+      }
+    }
+    parts.push([from, duration(chat)]);
+    const r = 18, mask = raw('agent-mask.png');
+    const corner = `hypot(max(max(${r}-X,X-(W-1-${r})),0),max(max(${r}-Y,Y-(H-1-${r})),0))`;
+    ffmpeg('-f', 'lavfi', '-i', `color=c=white:s=${w}x${h}:d=0.04,format=gray,geq=lum='255*clip(${r}+0.5-${corner},0,1)'`, '-frames:v', '1', '-update', '1', mask);
+    ffmpeg('-ss', String((chatStart - deskStart) / 1000), '-i', raw('agent-desk.mp4'), '-i', chat, '-loop', '1', '-i', mask, '-filter_complex',
+      `[0:v]fps=${FPS}[d];[1:v]fps=${FPS},format=rgba[c];[2:v]format=gray[m];[c][m]alphamerge=shortest=1[p];[d][p]overlay=${x}:${y}:shortest=1,split=${parts.length}${parts.map((_, i) => `[s${i}]`).join('')};` +
+      parts.map(([a, b], i) => `[s${i}]trim=start=${a}:end=${b},setpts=PTS-STARTPTS[p${i}]`).join(';') + ';' +
+      `${parts.map((_, i) => `[p${i}]`).join('')}concat=n=${parts.length}:v=1,${hold(1)}[v]`,
+      '-map', '[v]', ...encode(), out('ai-agent'));
   },
 
   hero() {

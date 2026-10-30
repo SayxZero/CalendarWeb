@@ -29,6 +29,8 @@ export const cfg = {
   sitePort: Number(env.MEDIA_SITE_PORT || 8782),
   codexModel: env.MEDIA_CODEX_MODEL || 'gpt-6-luna',
 };
+/** The chat page in the agent's video: its size, and where it stands in the frame. */
+export const AGENT_CHAT = { w: 432, h: 676, x: 18, y: 57 };
 export const serverAddress = `127.0.0.1:${cfg.serverPort}`;
 export const siteUrl = `http://127.0.0.1:${cfg.sitePort}`;
 export const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -88,11 +90,13 @@ export function wdrive(name, text, { wait = true } = {}) {
 }
 
 /** Runs a browser script (tools/cdp.mjs) given as text. */
-export function browser(name, text) {
+export function browser(name, text, { wait = true } = {}) {
   const file = path.join(WORK, `${name}.cdp.txt`);
   fs.writeFileSync(file, text);
-  const out = run(process.execPath, [path.join(MEDIA, 'tools/cdp.mjs'), file, '9333'],
-    { env: { ...process.env, MEDIA_FFMPEG: cfg.ffmpeg } });
+  const args = [path.join(MEDIA, 'tools/cdp.mjs'), file, '9333'];
+  const env = { ...process.env, MEDIA_FFMPEG: cfg.ffmpeg };
+  if (!wait) return spawn(process.execPath, args, { env, stdio: 'ignore' });
+  const out = run(process.execPath, args, { env });
   for (const line of out.split('\n')) if (/no text|no element|recorded/.test(line)) log(line.trim());
   return out;
 }
@@ -172,10 +176,10 @@ export async function freshServers() {
 
 // ---------------------------------------------------------------- sandboxes
 
-const iniCommon = (taskCheck) => `
+const iniCommon = (taskCheck, agent) => `
 [ui]
 paletteId=sky
-
+${agent ? 'tasksInCalendar=true\n\n[mcp]\nenabled=true\n' : ''}
 [taskCheck]
 mode=${taskCheck?.mode ?? 0}
 intervalMinutes=15
@@ -186,26 +190,27 @@ ${taskCheck?.reset ? `reset=${taskCheck.reset}\nlast=${taskCheck.reset}\n` : ''}
 melody=none
 `;
 
-function seedSandbox(folder, account, taskCheck) {
+function seedSandbox(folder, account, taskCheck, agent) {
   fs.rmSync(folder, { recursive: true, force: true, maxRetries: 20, retryDelay: 300 });
   fs.mkdirSync(folder, { recursive: true });
   run(path.join(WORK, 'seed-build/seed-account.exe'), [folder, serverAddress, account.login, account.token, account.id], { env: qtEnv() });
-  fs.appendFileSync(path.join(folder, 'settings.ini'), iniCommon(taskCheck));
+  fs.appendFileSync(path.join(folder, 'settings.ini'), iniCommon(taskCheck, agent));
 }
 
-let deskProcess = null;
+let deskProcess = null, deskFolder = null;
 export const desk = {
   /** The planner on this PC, window at a known place, no sound: 125 %, so that it reads in a small video. */
-  async start(account, { demo = false, taskCheck } = {}) {
+  async start(account, { demo = false, taskCheck, agent = false, window = '73 10 1454 845' } = {}) {
     desk.stop();
     // A new folder each time: Windows may hold the old one a moment after the process is gone.
     const folder = path.join(WORK, 'desk', `${account.login}-${Date.now()}`);
-    seedSandbox(folder, account, taskCheck);
+    seedSandbox(folder, account, taskCheck, agent);
     deskProcess = background(cfg.planner, ['--data-dir', folder, ...(demo ? ['--demo'] : [])],
       { env: { ...process.env, QT_SCALE_FACTOR: '1.25' }, detached: true });
     deskProcess.unref();
+    deskFolder = folder;
     await sleep(4000);
-    wdrive('place', `pid ${deskProcess.pid}\nwaitwin\nplace 73 10 1454 845\n`);
+    wdrive('place', `pid ${deskProcess.pid}\nwaitwin\nplace ${window}\n`);
     await sleep(1200);
     return deskProcess.pid;
   },
@@ -214,6 +219,8 @@ export const desk = {
     deskProcess = null;
   },
   get pid() { return deskProcess?.pid; },
+  /** The data folder of the running planner: where its MCP bridge has to look. */
+  get folder() { return deskFolder; },
 };
 
 const SANDBOX = '/sdcard/Android/data/org.calendarplanner.app/files/testdb';
@@ -359,10 +366,10 @@ export const meta = {
 };
 
 /** A clean base with the planner's own demo records in the account of anna. */
-export async function freshAccount() {
+export async function freshAccount(deskOptions = {}) {
   await freshServers();
   const anna = await register('anna', 'Анна');
-  await desk.start(anna, { demo: true });
+  await desk.start(anna, { demo: true, ...deskOptions });
   for (let i = 0; i < 60 && (await recordsOn(anna.token)) < 10; i++) await sleep(500);
   log(`anna has ${await recordsOn(anna.token)} records`);
   return anna;
